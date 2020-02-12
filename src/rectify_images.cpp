@@ -70,7 +70,7 @@ cv::Mat R = (cv::Mat_<double>(3,3) << 1, 0, 0,
 	                                  0, 1, 0, 
 	                                  0, 0, 1);
 
-cv::Mat T = (cv::Mat_<double>(3,1) << 0, 0.07, 0);
+cv::Mat T = (cv::Mat_<double>(3,1) << 0, -0.07, 0);
 
 
 
@@ -80,6 +80,8 @@ cv::Mat T = (cv::Mat_<double>(3,1) << 0, 0.07, 0);
 
  
 cv::Ptr<cv::StereoSGBM> sgbm = cv::StereoSGBM::create(0,16,3);
+
+cv::Ptr<cv::StereoBM> sbm = cv::StereoBM::create( 16*3, 21 );
 
 
 
@@ -106,6 +108,22 @@ void rectifyImages(const cv::Mat& imageLeft, const cv::Mat& imageRight, cv::Mat&
 
 	cv::remap(imageLeft, imageLeft_l, rmap[0][0], rmap[1][1], cv::INTER_LINEAR);
 	cv::remap(imageRight, imageRight_r, rmap[1][0], rmap[1][1], cv::INTER_LINEAR);
+
+	// cv::Mat pair;
+	// pair.create(imageSize.height, imageSize.width * 2, CV_8UC3);
+
+	// cv::Mat part = pair.colRange(0,  width);
+	//        cvtColor(imageLeft_l, part, cv::COLOR_GRAY2BGR);
+	//        part = pair.colRange( width,  width * 2);
+	//        cvtColor(imageRight_r, part, cv::COLOR_GRAY2BGR);
+	//        for (int j = 0; j <  height; j += 16){
+	//          cv::line(pair, cv::Point(0, j), cv::Point( width * 2, j),
+	//                   cv::Scalar(0, 255, 0));
+	//        }
+	      
+	// cv::imshow("rectified", pair);
+	// cv::waitKey();
+	       
 
 }
 
@@ -141,7 +159,7 @@ cv::Mat getDisparity(const cv::Mat& imageLeft, const cv::Mat& imageRight, cv::Ma
 
 
 	cv::Mat disp, disp8;
-	sgbm->compute(imageLeft, imageRight, disp);
+	sbm->compute(imageLeft, imageRight, disp);
 
 	
 
@@ -172,7 +190,7 @@ void getWorldPoints(const std::vector<cv::Point2f>& Points,	std::vector<cv::Poin
         double d = disparity.at<float>((int)pt.y,(int)pt.x);
 
         
-        if (d > .1){
+        if (d > .01){
         	pt_mat = (cv::Mat_<double>(4,1) << (int)pt.x, (int)pt.y, d, 1);
         	w_pt_mat = Q*pt_mat;
         	w_pt_mat /= w_pt_mat.at<double>(3,0);
@@ -182,11 +200,11 @@ void getWorldPoints(const std::vector<cv::Point2f>& Points,	std::vector<cv::Poin
         	std::cout << pt_mat<< std::endl;
         	std::cout << w_pt_mat << std::endl;
         	cv::Point3f w_pt(w_pt_mat.at<double>(0,0),w_pt_mat.at<double>(1,0),w_pt_mat.at<double>(2,0));
+        	worldPoints.push_back(w_pt);
+        	// if (w_pt.x < 3.5 && w_pt.y < 3.5 && w_pt.z < 3.5){
+        	// 	worldPoints.push_back(w_pt);
 
-        	if (w_pt.x < 3.5 && w_pt.y < 3.5 && w_pt.z < 3.5){
-        		worldPoints.push_back(w_pt);
-
-        	} 
+        	// } 
         	
         }
         

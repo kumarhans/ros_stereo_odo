@@ -7,7 +7,11 @@
 #include <image_transport/image_transport.h>
 #include <message_filters/synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
+#include <math.h>
  
+#ifndef M_PI
+const double M_PI = 3.14159265358979323846;
+#endif
  
 //Standard utilities
 #include <iostream>
@@ -67,10 +71,15 @@ void StereoOdometry::initializeSubsAndPubs(){
     marker.color.g = 1.0;
     marker.color.b = 1.0;
 
-    Q = (cv::Mat_<double>(4,4) << 1, 0, 0, -320, 
-                                          0, 1, 0, -240, 
-                                          0, 0, 0, -554.3826904296875,
-                                          0, 0, -14.28571428571428, 0);
+    R_init = (cv::Mat_<double>(3,3) << 1, 0, 0, 
+                                       0, cos(M_PI /3), -sin(M_PI/3), 
+                                       0, sin(M_PI /3), cos(M_PI/3));
+    T_init = (cv::Mat_<double>(3,1) << 0, 0, .75);
+
+    // Q = (cv::Mat_<double>(4,4) << 1, 0, 0, -320, 
+    //                                       0, 1, 0, -240, 
+    //                                       0, 0, 0, -554.3826904296875,
+    //                                       0, 0, -14.28571428571428, 0);
 
 
 }
@@ -82,12 +91,12 @@ void StereoOdometry::imageCallback(const sensor_msgs::ImageConstPtr& left_msg, c
         curr_image_left = cv_bridge::toCvShare(left_msg, "mono8")->image;
         curr_image_right = cv_bridge::toCvShare(right_msg, "mono8")->image;
 
-        //rectifyImages( curr_image_left,  curr_image_right, curr_image_left, curr_image_right,Q);\
-
+        rectifyImages( curr_image_left,  curr_image_right, curr_image_left, curr_image_right,Q);
 
 
         //getDepthMap( curr_image_left,  curr_image_right, depth_map_curr, Q);
         //getDepthMap( prev_image_left,  prev_image_right, depth_map_prev, Q); 
+        cv::Mat disp = getDisparity(curr_image_left, curr_image_right,  Q);
 
 
         
@@ -104,16 +113,36 @@ void StereoOdometry::imageCallback(const sensor_msgs::ImageConstPtr& left_msg, c
             getWorldPoints(prevPoints, prevWorldPoints, dispPrev,Q);
             getWorldPoints(currPoints, currWorldPoints, dispCurr,Q);
 
+            int n = 4; 
+            int m = 5; 
+          
+            // Create a vector containing n 
+            //vectors of size m.  
+            ad_mat =  std::vector<std::vector<int>>(currPoints.size() , std::vector<int> (currPoints.size(),0)); 
+
+            for (int i = 0,i<currWorldPoints.size(); i++){
+                for (int j = 0,j<currWorldPoints.size(); j++){
+                    double distCurr = getDistance(currWorldPoints.at(i),currWorldPoints.at(j))
+                    double distPrev = getDistance(prevWorldPoints.at(i),prevWorldPoints.at(j))
+                    if (abs(distCurr-distPrev) < thresh){
+                        ad_mat[i][j] = 1;
+                    }
+                }
+            }
 
             
 
 
             for (int i = 0; i<currWorldPoints.size(); i++){
-                cv::Point3f pt = currWorldPoints.at(i);
 
-                marker.pose.position.x = pt.x;
-                marker.pose.position.y = pt.y;
-                marker.pose.position.z = pt.z;
+                cv::Point3f pt = currWorldPoints.at(i);
+                cv::Mat temp = (cv::Mat_<double>(3,1) << pt.x, pt.y, pt.z);
+                cv::Mat Final = R_init*temp+T_init;
+
+
+                marker.pose.position.x = Final.at<double>(0,0);
+                marker.pose.position.y = Final.at<double>(1,0);
+                marker.pose.position.z = Final.at<double>(2,0);
                 marker.id = i;
                 vis_pub.publish( marker );
             

@@ -45,7 +45,12 @@ public:
     cv::Mat depth_map_prev;
     cv::Mat depth_map_curr;
 
+    cv::Mat R_init;
+    cv::Mat T_init;
+
     visualization_msgs::Marker marker;
+
+    std::vector<std::vector<int>> ad_mat;
     
 private:
 
