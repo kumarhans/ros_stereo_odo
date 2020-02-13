@@ -8,6 +8,7 @@
 #include <message_filters/synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
 #include <math.h>
+#include <numeric>
  
 #ifndef M_PI
 const double M_PI = 3.14159265358979323846;
@@ -20,6 +21,7 @@ const double M_PI = 3.14159265358979323846;
 #include "stereo_odometry.h"
 #include "detect_features.h"
 #include "rectify_images.h"
+#include "point_util.h"
 
 int main(int argc, char **argv)
 {
@@ -110,30 +112,67 @@ void StereoOdometry::imageCallback(const sensor_msgs::ImageConstPtr& left_msg, c
             cv::Mat dispCurr = getDisparity(curr_image_left, curr_image_right,  Q);
             std::vector<cv::Point3f> currWorldPoints;
             std::vector<cv::Point3f> prevWorldPoints;
-            getWorldPoints(prevPoints, prevWorldPoints, dispPrev,Q);
-            getWorldPoints(currPoints, currWorldPoints, dispCurr,Q);
 
-            int n = 4; 
-            int m = 5; 
-          
-            // Create a vector containing n 
-            //vectors of size m.  
-            ad_mat =  std::vector<std::vector<int>>(currPoints.size() , std::vector<int> (currPoints.size(),0)); 
+            getWorldPoints(prevPoints, currPoints, prevWorldPoints, currWorldPoints, dispPrev, dispCurr, Q);
 
-            for (int i = 0,i<currWorldPoints.size(); i++){
-                for (int j = 0,j<currWorldPoints.size(); j++){
-                    double distCurr = getDistance(currWorldPoints.at(i),currWorldPoints.at(j))
-                    double distPrev = getDistance(prevWorldPoints.at(i),prevWorldPoints.at(j))
-                    if (abs(distCurr-distPrev) < thresh){
-                        ad_mat[i][j] = 1;
-                    }
-                }
+
+            // std::cout << prevPoints.size() << std::endl;
+            // std::cout << currPoints.size() << std::endl;
+
+            // std::cout << prevWorldPoints.size() << std::endl;
+            // std::cout << currWorldPoints.size() << std::endl;
+
+            std::vector<std::vector<int>> ad_mat = getAdjacenyMatrix(prevWorldPoints, currWorldPoints, .1);
+
+            std::vector<int> clique = initializeClique(ad_mat);
+            // for (int i = 0; i < clique.size(); i++) { 
+            //     std::cout<< clique[i] << std::endl;
+            // } 
+
+
+            std::vector<int> potSet = potentialNodes(clique, ad_mat);
+
+            while (std::accumulate(potSet.begin(), potSet.end(), 0) > 0){
+                updateClique(potSet ,clique,ad_mat);
+                potSet = potentialNodes(clique, ad_mat);
+
+
             }
+
+            //std::cout << clique.size()<< std::endl;
+            // for (int i = 0; i < clique.size(); i++) { 
+            //     std::cout<< clique[i] << std::endl;
+            // } 
+
+
+            
+            
+            
+
+            // for (int i = 0; i < ad_mat.size(); i++) { 
+            //     for (int j = 0; j < ad_mat.size(); j++){ 
+            //         std::cout<< ad_mat[i][j]<< " "; 
+            //     } 
+            //     std::cout<< "\n"; 
+            // } 
+
+
+            
 
             
 
 
             for (int i = 0; i<currWorldPoints.size(); i++){
+
+               
+
+                if (std::find(clique.begin(), clique.end(), i) != clique.end()){
+                    marker.color.g = 1.0;
+                }
+                else{
+                    marker.color.g = 0.0;
+                }
+
 
                 cv::Point3f pt = currWorldPoints.at(i);
                 cv::Mat temp = (cv::Mat_<double>(3,1) << pt.x, pt.y, pt.z);

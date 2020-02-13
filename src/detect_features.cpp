@@ -48,6 +48,7 @@ void deleteFeatures(std::vector<cv::Point2f>& prevPoints, std::vector<cv::Point2
         cv::Point2f pt = currPoints.at(i- offset);
         if (status[i] == 0 || pt.x < 0 || pt.y < 0){
             currPoints.erase(currPoints.begin() + (i - offset));
+            prevPoints.erase(prevPoints.begin() + (i - offset));
             offset ++;
         }
     }

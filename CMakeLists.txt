@@ -56,6 +56,7 @@ add_executable (stereo_odom_node
 src/stereo_odometry.cpp
 src/detect_features.cpp
 src/rectify_images.cpp
+src/point_util.cpp
 )
 
 target_link_libraries(stereo_odom_node ${catkin_LIBRARIES} ${OpenCV_LIBS})

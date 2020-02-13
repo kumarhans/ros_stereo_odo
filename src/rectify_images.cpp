@@ -32,18 +32,6 @@ double k3= 0.0;
 int width= 480;
 int height= 360;
 
-// Camera.k1: 0.0
-// Camera.k2: 0.0
-// Camera.p1: 0.0
-// Camera.p2: 0.0
-// Camera.k3: 0.0
-
-// Camera.width: 480
-// Camera.height: 360
-
-//stereoRectify
-//initUndistortRectifyMap
-//remap
 
 std::vector<cv::Mat> CM; // Stores 3x3 Camera Matricies
 cv::Mat cameraMatrix1 = (cv::Mat_<double>(3,3) << fx, 0, cx, 
@@ -72,22 +60,15 @@ cv::Mat R = (cv::Mat_<double>(3,3) << 1, 0, 0,
 
 cv::Mat T = (cv::Mat_<double>(3,1) << 0, -0.07, 0);
 
-
-
-
- 
-
-
  
 cv::Ptr<cv::StereoSGBM> sgbm = cv::StereoSGBM::create(0,16,3);
-
 cv::Ptr<cv::StereoBM> sbm = cv::StereoBM::create( 16*3, 21 );
 
 
 
 
 
-void rectifyImages(const cv::Mat& imageLeft, const cv::Mat& imageRight, cv::Mat& imageLeft_l, cv::Mat& imageRight_r, cv::Mat& Q){
+void rectifyImages(const cv::Mat& imageLeft, const cv::Mat& imageRight, cv::Mat& imageLeft_l, cv::Mat& imageRight_r, cv::Mat& Q, bool draw){
 
 	CM.push_back(cameraMatrix1);
 	CM.push_back(cameraMatrix2);
@@ -109,22 +90,24 @@ void rectifyImages(const cv::Mat& imageLeft, const cv::Mat& imageRight, cv::Mat&
 	cv::remap(imageLeft, imageLeft_l, rmap[0][0], rmap[1][1], cv::INTER_LINEAR);
 	cv::remap(imageRight, imageRight_r, rmap[1][0], rmap[1][1], cv::INTER_LINEAR);
 
-	// cv::Mat pair;
-	// pair.create(imageSize.height, imageSize.width * 2, CV_8UC3);
 
-	// cv::Mat part = pair.colRange(0,  width);
-	//        cvtColor(imageLeft_l, part, cv::COLOR_GRAY2BGR);
-	//        part = pair.colRange( width,  width * 2);
-	//        cvtColor(imageRight_r, part, cv::COLOR_GRAY2BGR);
-	//        for (int j = 0; j <  height; j += 16){
-	//          cv::line(pair, cv::Point(0, j), cv::Point( width * 2, j),
-	//                   cv::Scalar(0, 255, 0));
-	//        }
-	      
-	// cv::imshow("rectified", pair);
-	// cv::waitKey();
-	       
+	//DRAW RECTIFIED IMAGE
+	if (draw){
+		cv::Mat pair;
+		pair.create(imageSize.height, imageSize.width * 2, CV_8UC3);
 
+		cv::Mat part = pair.colRange(0,  width);
+		       cvtColor(imageLeft_l, part, cv::COLOR_GRAY2BGR);
+		       part = pair.colRange( width,  width * 2);
+		       cvtColor(imageRight_r, part, cv::COLOR_GRAY2BGR);
+		       for (int j = 0; j <  height; j += 16){
+		         cv::line(pair, cv::Point(0, j), cv::Point( width * 2, j),
+		                  cv::Scalar(0, 255, 0));
+		       }
+		      
+		cv::imshow("rectified", pair);
+		cv::waitKey();
+	}
 }
 
 
@@ -138,77 +121,18 @@ void getDepthMap(const cv::Mat& imageLeft, const cv::Mat& imageRight, cv::Mat& d
 }
 
 cv::Mat getDisparity(const cv::Mat& imageLeft, const cv::Mat& imageRight, cv::Mat& Q){
-
-
-    // int numberOfDisparities = (( width/8) + 15) & -16;
-
-    // sgbm->setPreFilterCap(63);
-    // int sgbmWinSize =  3;
-    // sgbm->setBlockSize(sgbmWinSize);
-
-    // int cn = imageLeft.channels();
-
-    // sgbm->setP1(8*cn*sgbmWinSize*sgbmWinSize);
-    // sgbm->setP2(32*cn*sgbmWinSize*sgbmWinSize);
-    // sgbm->setMinDisparity(0);
-    // sgbm->setNumDisparities(numberOfDisparities);
-    // sgbm->setUniquenessRatio(10);
-    // sgbm->setSpeckleWindowSize(100);
-    // sgbm->setSpeckleRange(32);
-    // sgbm->setDisp12MaxDiff(1);
-
-
 	cv::Mat disp, disp8;
 	sbm->compute(imageLeft, imageRight, disp);
-
-	
-
-	//0/0;
-
 	disp.convertTo( disp8, CV_32F, 1./16);
-
-	//std::cout << disp8<< std::endl;
-	 
-	//cv::normalize(disp, disp8, 0, 255, CV_MINMAX, CV_8U);
-
 	return disp8;
+}
 
+
+cv::Mat getDisparityImage(const cv::Mat& imageLeft, const cv::Mat& imageRight, cv::Mat& Q){
+	cv::Mat disp, disp8;
+	sbm->compute(imageLeft, imageRight, disp);
+	cv::normalize(disp, disp8, 0, 255, CV_MINMAX, CV_8U);
+	return disp8;
 }
 
  
-void getWorldPoints(const std::vector<cv::Point2f>& Points,	std::vector<cv::Point3f>& worldPoints, const cv::Mat& disparity,  cv::Mat& Q){
-
-	cv::Mat pt_mat;
-	cv::Mat w_pt_mat;
-	//Q.at<double>(2,3)= -1*(Q.at<double>(2,3));
-
-	 for (int i = 0; i<Points.size(); i++){
-        cv::Point2f pt = Points.at(i);
-        //std::cout << disparity  << std::endl;
-        // std::cout << (int)pt.x << std::endl;
-         
-        double d = disparity.at<float>((int)pt.y,(int)pt.x);
-
-        
-        if (d > .01){
-        	pt_mat = (cv::Mat_<double>(4,1) << (int)pt.x, (int)pt.y, d, 1);
-        	w_pt_mat = Q*pt_mat;
-        	w_pt_mat /= w_pt_mat.at<double>(3,0);
-        	
-        	std::cout << d <<  std::endl;
-         
-        	std::cout << pt_mat<< std::endl;
-        	std::cout << w_pt_mat << std::endl;
-        	cv::Point3f w_pt(w_pt_mat.at<double>(0,0),w_pt_mat.at<double>(1,0),w_pt_mat.at<double>(2,0));
-        	worldPoints.push_back(w_pt);
-        	// if (w_pt.x < 3.5 && w_pt.y < 3.5 && w_pt.z < 3.5){
-        	// 	worldPoints.push_back(w_pt);
-
-        	// } 
-        	
-        }
-        
-    }
-
-
-}
