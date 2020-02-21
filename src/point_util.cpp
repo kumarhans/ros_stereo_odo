@@ -5,6 +5,7 @@
 #include "opencv2/calib3d/calib3d.hpp"
 
 
+
 #include <iostream>
 #include <ctype.h>
 #include <algorithm>
@@ -25,7 +26,7 @@
 
 
 
-void getWorldPoints(const std::vector<cv::Point2f>& PointsPrev,	const std::vector<cv::Point2f>& PointsCurr, 
+void getWorldPoints(std::vector<cv::Point2f>& PointsPrev, std::vector<cv::Point2f>& PointsCurr, 
     std::vector<cv::Point3f>& worldPointsPrev, std::vector<cv::Point3f>& worldPointsCurr, 
     const cv::Mat& disparityPrev, const cv::Mat& disparityCurr, cv::Mat& Q){
 
@@ -33,13 +34,15 @@ void getWorldPoints(const std::vector<cv::Point2f>& PointsPrev,	const std::vecto
 	cv::Mat w_pt_mat_curr;
     cv::Mat pt_mat_prev;
     cv::Mat w_pt_mat_prev;
+    int offset = 0;
+    int s = PointsPrev.size();
 
-	 for (int i = 0; i<PointsPrev.size(); i++){
+	 for (int i = 0; i<s; i++){
 
-        cv::Point2f ptPrev = PointsPrev.at(i);
+        cv::Point2f ptPrev = PointsPrev.at(i - offset);
         double dPrev = disparityPrev.at<float>((int)ptPrev.y,(int)ptPrev.x);
 
-        cv::Point2f ptCurr = PointsCurr.at(i);
+        cv::Point2f ptCurr = PointsCurr.at(i - offset);
         double dCurr = disparityCurr.at<float>((int)ptCurr.y,(int)ptCurr.x);
 
         if (dPrev > .01 && dCurr > .01){
@@ -54,9 +57,12 @@ void getWorldPoints(const std::vector<cv::Point2f>& PointsPrev,	const std::vecto
             w_pt_mat_curr /= w_pt_mat_curr.at<double>(3,0);
             cv::Point3f w_pt_curr(w_pt_mat_curr.at<double>(0,0),w_pt_mat_curr.at<double>(1,0),w_pt_mat_curr.at<double>(2,0));
             worldPointsCurr.push_back(w_pt_curr);
+        } else {
+            PointsCurr.erase(PointsCurr.begin() + (i - offset));
+            PointsPrev.erase(PointsPrev.begin() + (i - offset));
+            offset ++;
+        }
 
-
-        }   
     }
 }
 
@@ -135,6 +141,27 @@ void updateClique(std::vector<int> potentialSet, std::vector<int>& clique,
 
     if (maxMatches > 0){
         clique.push_back(currMax);
+    }
+}
+
+void updateCloud(std::vector<cv::Point2f>& PointsPrev, std::vector<cv::Point2f>& PointsCurr, 
+    std::vector<cv::Point3f>& worldPointsPrev, std::vector<cv::Point3f>& worldPointsCurr,std::vector<int>& clique){
+
+    int offset = 0;
+    int s = worldPointsCurr.size();
+
+    for (int i = 0; i<s; i++){
+        if (std::find(clique.begin(), clique.end(), i) != clique.end()){
+            (void)0;
+        }
+        else{
+            PointsCurr.erase(PointsCurr.begin() + (i - offset));
+            PointsPrev.erase(PointsPrev.begin() + (i - offset));
+            worldPointsCurr.erase(worldPointsCurr.begin() + (i - offset));
+            worldPointsPrev.erase(worldPointsPrev.begin() + (i - offset));
+            
+            offset ++;
+        }
     }
 }
 

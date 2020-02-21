@@ -22,6 +22,7 @@ const double M_PI = 3.14159265358979323846;
 #include "detect_features.h"
 #include "rectify_images.h"
 #include "point_util.h"
+#include "optimize_pose.h"
 
 int main(int argc, char **argv)
 {
@@ -57,7 +58,7 @@ void StereoOdometry::initializeSubsAndPubs(){
     marker.header.frame_id = "world";
     marker.header.stamp = ros::Time();
     marker.lifetime = ros::Duration(1.5);
-    marker.ns = "my_namespace";
+    
     marker.id = 0;
     marker.type = visualization_msgs::Marker::SPHERE;
     marker.action = visualization_msgs::Marker::ADD;
@@ -82,6 +83,7 @@ void StereoOdometry::initializeSubsAndPubs(){
     //                                       0, 1, 0, -240, 
     //                                       0, 0, 0, -554.3826904296875,
     //                                       0, 0, -14.28571428571428, 0);
+    pose = (cv::Mat_<double>(3,1) << 0, 0, 0) ;
 
 
 }
@@ -93,7 +95,7 @@ void StereoOdometry::imageCallback(const sensor_msgs::ImageConstPtr& left_msg, c
         curr_image_left = cv_bridge::toCvShare(left_msg, "mono8")->image;
         curr_image_right = cv_bridge::toCvShare(right_msg, "mono8")->image;
 
-        rectifyImages( curr_image_left,  curr_image_right, curr_image_left, curr_image_right,Q);
+        cv::Mat P = rectifyImages( curr_image_left,  curr_image_right, curr_image_left, curr_image_right,Q);
 
 
         //getDepthMap( curr_image_left,  curr_image_right, depth_map_curr, Q);
@@ -112,9 +114,13 @@ void StereoOdometry::imageCallback(const sensor_msgs::ImageConstPtr& left_msg, c
             cv::Mat dispCurr = getDisparity(curr_image_left, curr_image_right,  Q);
             std::vector<cv::Point3f> currWorldPoints;
             std::vector<cv::Point3f> prevWorldPoints;
+            std::cout << prevPoints.size() << std::endl;
+            std::cout << currPoints.size() << std::endl;
 
             getWorldPoints(prevPoints, currPoints, prevWorldPoints, currWorldPoints, dispPrev, dispCurr, Q);
 
+
+            
 
             // std::cout << prevPoints.size() << std::endl;
             // std::cout << currPoints.size() << std::endl;
@@ -122,7 +128,7 @@ void StereoOdometry::imageCallback(const sensor_msgs::ImageConstPtr& left_msg, c
             // std::cout << prevWorldPoints.size() << std::endl;
             // std::cout << currWorldPoints.size() << std::endl;
 
-            std::vector<std::vector<int>> ad_mat = getAdjacenyMatrix(prevWorldPoints, currWorldPoints, .1);
+            std::vector<std::vector<int>> ad_mat = getAdjacenyMatrix(prevWorldPoints, currWorldPoints, .01);
 
             std::vector<int> clique = initializeClique(ad_mat);
             // for (int i = 0; i < clique.size(); i++) { 
@@ -135,65 +141,88 @@ void StereoOdometry::imageCallback(const sensor_msgs::ImageConstPtr& left_msg, c
             while (std::accumulate(potSet.begin(), potSet.end(), 0) > 0){
                 updateClique(potSet ,clique,ad_mat);
                 potSet = potentialNodes(clique, ad_mat);
-
-
             }
 
-            //std::cout << clique.size()<< std::endl;
-            // for (int i = 0; i < clique.size(); i++) { 
-            //     std::cout<< clique[i] << std::endl;
-            // } 
-
-
-            
-            
+            updateCloud(prevPoints, currPoints, prevWorldPoints, currWorldPoints, clique);
             
 
-            // for (int i = 0; i < ad_mat.size(); i++) { 
-            //     for (int j = 0; j < ad_mat.size(); j++){ 
-            //         std::cout<< ad_mat[i][j]<< " "; 
-            //     } 
-            //     std::cout<< "\n"; 
-            // } 
+            cv::Mat optoTrans = optimizeTrans( P,  prevWorldPoints,  currWorldPoints,currPoints,prevPoints);
 
 
-            
+            cv::Mat trans = (cv::Mat_<double>(3,1) << optoTrans.at<double>(0,3)
+                , optoTrans.at<double>(1,3), optoTrans.at<double>(2,3));
+
+            pose = pose + R_init*trans;
 
             
 
 
+
+            std::cout << clique.size() << std::endl;
+            std::cout << prevPoints.size() << std::endl;
+            std::cout << currPoints.size() << std::endl;
+
+            std::cout << prevWorldPoints.size() << std::endl;
+            std::cout << currWorldPoints.size() << std::endl;
+           
+
+            
             for (int i = 0; i<currWorldPoints.size(); i++){
 
-               
 
-                if (std::find(clique.begin(), clique.end(), i) != clique.end()){
-                    marker.color.g = 1.0;
-                }
-                else{
-                    marker.color.g = 0.0;
-                }
-
-
-                cv::Point3f pt = currWorldPoints.at(i);
+                cv::Point3f pt = prevWorldPoints.at(i);
                 cv::Mat temp = (cv::Mat_<double>(3,1) << pt.x, pt.y, pt.z);
-                cv::Mat Final = R_init*temp+T_init;
+                cv::Mat Final = pose + R_init*temp-T_init;
+                marker.ns = "prev_namespace";
 
 
                 marker.pose.position.x = Final.at<double>(0,0);
                 marker.pose.position.y = Final.at<double>(1,0);
                 marker.pose.position.z = Final.at<double>(2,0);
                 marker.id = i;
+                marker.color.g = 0.0;
                 vis_pub.publish( marker );
             
             }
 
+            for (int i = 0; i<currWorldPoints.size(); i++){
+
+
+                cv::Point3f pt = currWorldPoints.at(i);
+                cv::Mat temp = (cv::Mat_<double>(3,1) << pt.x, pt.y, pt.z);
+                cv::Mat Final = pose + R_init*temp-T_init;
+                marker.ns = "curr_namespace";
+
+
+                marker.pose.position.x = Final.at<double>(0,0);
+                marker.pose.position.y = Final.at<double>(1,0);
+                marker.pose.position.z = Final.at<double>(2,0);
+                marker.id = i+1000;
+                marker.color.g = 1.0;
+                vis_pub.publish( marker );
+            
+            }
+            drawFeatures(curr_image_left,  debug_image, currPoints, prevPoints);
+
         }
 
 
-        drawFeatures(curr_image_left,  debug_image, currPoints);
-
-       
         
+        pose += T_init;
+        marker.ns = "yah_namespace";
+        marker.pose.position.x = pose.at<double>(0,0);
+        marker.pose.position.y = pose.at<double>(1,0);
+        marker.pose.position.z = pose.at<double>(2,0);
+        marker.id = 0;
+        marker.color.g = 0.5;
+        marker.scale.x = 0.2;
+        marker.scale.y = 0.2;
+        marker.scale.z = 0.2;
+        vis_pub.publish( marker );
+        marker.scale.x = 0.05;
+        marker.scale.y = 0.05;
+        marker.scale.z = 0.05;
+        pose -= T_init;
         prevPoints = currPoints;
         std::vector<cv::Point2f> tmp;
         currPoints = tmp;

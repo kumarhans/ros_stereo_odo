@@ -55,11 +55,19 @@ void deleteFeatures(std::vector<cv::Point2f>& prevPoints, std::vector<cv::Point2
    
 }
 
-void drawFeatures(const cv::Mat& image, cv::Mat& debug_image, std::vector<cv::Point2f>& points){
+void drawFeatures(const cv::Mat& image, cv::Mat& debug_image, std::vector<cv::Point2f>& points, std::vector<cv::Point2f>& pointsPrev){
     
     image.copyTo(debug_image);
+    std::cout << "prevPoints" << pointsPrev.size() << std::endl;
+    std::cout << "currPoints" << points.size() << std::endl;
+
     for(int i=0;i<points.size();i++){
-        cv::circle(debug_image, points[i], 3, 1, -1, 8);
+        if (pointsPrev.size() == points.size()){
+            //cv::circle(debug_image, points[i], 1, 1, -1, 8);
+            cv::circle(debug_image, pointsPrev[i], 1, 255, -1 ,8);
+
+        }
+        
     }
 }
 

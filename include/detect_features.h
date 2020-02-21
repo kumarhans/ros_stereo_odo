@@ -23,6 +23,6 @@ void initKeypoints(const cv::Mat& image, std::vector<cv::KeyPoint>& keypoints, s
 void matchFeatures(const cv::Mat& prevImage, const cv::Mat& currImage, std::vector<cv::Point2f>& prevPoints, 
     std::vector<cv::Point2f>& currPoints);
 
-void drawFeatures(const cv::Mat& image, cv::Mat& debug_image, std::vector<cv::Point2f>& points);
-
+void drawFeatures(const cv::Mat& image, cv::Mat& debug_image, std::vector<cv::Point2f>& points, 
+	std::vector<cv::Point2f>& pointsPrev);
 void deleteFeatures(std::vector<cv::Point2f>& prevPoints, std::vector<cv::Point2f>& currPoints, std::vector<uchar> status);

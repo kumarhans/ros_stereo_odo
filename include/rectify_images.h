@@ -19,10 +19,9 @@
  
 
 
-void rectifyImages(const cv::Mat& imageLeft, const cv::Mat& imageRight, cv::Mat& imageLeft_l, cv::Mat& imageRight_r, cv::Mat& Q, bool draw = false);
+cv::Mat rectifyImages(const cv::Mat& imageLeft, const cv::Mat& imageRight, cv::Mat& imageLeft_l, cv::Mat& imageRight_r, cv::Mat& Q, bool draw = false);
 void getDepthMap(const cv::Mat& imageLeft, const cv::Mat& imageRight, cv::Mat& depth_map, cv::Mat& Q);
 cv::Mat getDisparity(const cv::Mat& imageLeft, const cv::Mat& imageRight, cv::Mat& Q);
 cv::Mat getDisparityImage(const cv::Mat& imageLeft, const cv::Mat& imageRight, cv::Mat& Q);
 
 
-void getWorldPoints(const std::vector<cv::Point2f>& Points,	std::vector<cv::Point3f>& worldPoints, const cv::Mat& disparity,  cv::Mat& Q);

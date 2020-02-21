@@ -48,6 +48,9 @@ public:
     cv::Mat R_init;
     cv::Mat T_init;
 
+    cv::Mat H_init;
+    cv::Mat pose;
+
     visualization_msgs::Marker marker;
 
     std::vector<std::vector<int>> ad_mat;

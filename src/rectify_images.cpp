@@ -68,7 +68,7 @@ cv::Ptr<cv::StereoBM> sbm = cv::StereoBM::create( 16*3, 21 );
 
 
 
-void rectifyImages(const cv::Mat& imageLeft, const cv::Mat& imageRight, cv::Mat& imageLeft_l, cv::Mat& imageRight_r, cv::Mat& Q, bool draw){
+cv::Mat rectifyImages(const cv::Mat& imageLeft, const cv::Mat& imageRight, cv::Mat& imageLeft_l, cv::Mat& imageRight_r, cv::Mat& Q, bool draw){
 
 	CM.push_back(cameraMatrix1);
 	CM.push_back(cameraMatrix2);
@@ -108,6 +108,8 @@ void rectifyImages(const cv::Mat& imageLeft, const cv::Mat& imageRight, cv::Mat&
 		cv::imshow("rectified", pair);
 		cv::waitKey();
 	}
+
+	return P1;
 }
 
 

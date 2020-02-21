@@ -27,7 +27,7 @@ double getDistance(cv::Point3f& pt1, cv::Point3f& pt2);
 std::vector<std::vector<int>> getAdjacenyMatrix(std::vector<cv::Point3f>& currPoints, 
     std::vector<cv::Point3f>& prevPoints, double thresh);
 
-void getWorldPoints(const std::vector<cv::Point2f>& PointsPrev,	const std::vector<cv::Point2f>& PointsCurr, 
+void getWorldPoints(std::vector<cv::Point2f>& PointsPrev, std::vector<cv::Point2f>& PointsCurr, 
     std::vector<cv::Point3f>& worldPointsPrev, std::vector<cv::Point3f>& worldPointsCurr, 
     const cv::Mat& disparityPrev, const cv::Mat& disparityCurr, cv::Mat& Q);
 
@@ -37,4 +37,6 @@ void updateClique(std::vector<int> potentialSet, std::vector<int>& clique,
 
 std::vector<int> potentialNodes(const std::vector<int>& clique, const std::vector<std::vector<int>>& ad_mat);
 
+void updateCloud(std::vector<cv::Point2f>& PointsPrev, std::vector<cv::Point2f>& PointsCurr, 
+    std::vector<cv::Point3f>& worldPointsPrev, std::vector<cv::Point3f>& worldPointsCurr,std::vector<int>& clique);
        

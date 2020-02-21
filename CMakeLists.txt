@@ -57,6 +57,7 @@ src/stereo_odometry.cpp
 src/detect_features.cpp
 src/rectify_images.cpp
 src/point_util.cpp
+src/optimize_pose.cpp
 )
 
 target_link_libraries(stereo_odom_node ${catkin_LIBRARIES} ${OpenCV_LIBS})
