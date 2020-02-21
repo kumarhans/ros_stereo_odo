@@ -12,6 +12,7 @@
 #include <message_filters/sync_policies/approximate_time.h>
 #include "opencv2/features2d/features2d.hpp"
 #include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
  
 
  
@@ -34,10 +35,6 @@ public:
 
     std::vector<cv::Point2f> currPoints;
     std::vector<cv::Point2f> prevPoints;
-
-
-
-
     std::vector<cv::KeyPoint> keypoints;
 
     cv::Mat disparity;
@@ -51,7 +48,7 @@ public:
     cv::Mat H_init;
     cv::Mat pose;
 
-    visualization_msgs::Marker marker;
+    visualization_msgs::MarkerArray ma;
 
     std::vector<std::vector<int>> ad_mat;
     
@@ -70,7 +67,6 @@ private:
 
     ros::Publisher vis_pub;
 
-    
 
     void imageCallback(const sensor_msgs::ImageConstPtr& left_msg, const sensor_msgs::ImageConstPtr& right_msg);
 
