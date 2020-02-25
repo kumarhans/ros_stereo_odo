@@ -155,8 +155,8 @@ cv::Mat optimizeTrans(cv::Mat P, std::vector<cv::Point3f>& worldPointsPrev,
 	Eigen::LevenbergMarquardt<LMFunctor, float> lm(functor);
 
 	int status = lm.minimize(x);	
-	std::cout << "LM optimization status: " << status << std::endl;
-	std::cout << x << std::endl;
+	// std::cout << "LM optimization status: " << status << std::endl;
+	// std::cout << x << std::endl;
 
 	cv::Mat transform = toTransformationMat(x);
 

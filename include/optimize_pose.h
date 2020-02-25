@@ -27,7 +27,6 @@
 
 cv::Mat toTransformationMat(const Eigen::VectorXf &x);
 
-
 struct LMFunctor;
 
 cv::Mat optimizeTrans(cv::Mat P, std::vector<cv::Point3f>& worldPointsPrev, 

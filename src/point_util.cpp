@@ -145,7 +145,16 @@ void updateClique(std::vector<int> potentialSet, std::vector<int>& clique,
 }
 
 void updateCloud(std::vector<cv::Point2f>& PointsPrev, std::vector<cv::Point2f>& PointsCurr, 
-    std::vector<cv::Point3f>& worldPointsPrev, std::vector<cv::Point3f>& worldPointsCurr,std::vector<int>& clique){
+    std::vector<cv::Point3f>& worldPointsPrev, std::vector<cv::Point3f>& worldPointsCurr){
+
+    std::vector<std::vector<int>> ad_mat = getAdjacenyMatrix(worldPointsPrev, worldPointsCurr, .1);
+    std::vector<int> clique = initializeClique(ad_mat);
+    std::vector<int> potSet = potentialNodes(clique, ad_mat);
+    while (std::accumulate(potSet.begin(), potSet.end(), 0) > 0){
+        updateClique(potSet ,clique,ad_mat);
+        potSet = potentialNodes(clique, ad_mat);
+    }
+
 
     int offset = 0;
     int s = worldPointsCurr.size();
@@ -184,4 +193,4 @@ std::vector<int> potentialNodes(const std::vector<int>& clique, const std::vecto
 
 }
 
-            
+

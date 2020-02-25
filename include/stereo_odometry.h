@@ -13,6 +13,10 @@
 #include "opencv2/features2d/features2d.hpp"
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2_ros/transform_broadcaster.h>
+#include <geometry_msgs/TransformStamped.h>
+#include <turtlesim/Pose.h>
  
 
  
@@ -24,6 +28,8 @@ public:
     ~StereoOdometry();
 
     bool init;
+    bool depthMap;
+    bool visualize;
 
     cv::Mat prev_image_left;
     cv::Mat prev_image_right;
@@ -42,19 +48,17 @@ public:
     cv::Mat depth_map_prev;
     cv::Mat depth_map_curr;
 
-    cv::Mat R_init;
-    cv::Mat T_init;
-
     cv::Mat H_init;
     cv::Mat pose;
 
-    visualization_msgs::MarkerArray ma;
-
     std::vector<std::vector<int>> ad_mat;
+  
     
 private:
 
     void initializeSubsAndPubs();
+    void getInitialRot(double angleDown, double height);
+    void visualizePoints(std::vector<cv::Point3f>& currWorldPoints, std::vector<cv::Point3f>& prevWorldPoints);
 
     ros::NodeHandle nh;
     image_transport::ImageTransport it;
@@ -64,7 +68,7 @@ private:
 
     image_transport::Publisher debug_pub;
     ros::Publisher pose_pub;
-
+    
     ros::Publisher vis_pub;
 
 

@@ -23,6 +23,11 @@ const double M_PI = 3.14159265358979323846;
 #include "rectify_images.h"
 #include "point_util.h"
 #include "optimize_pose.h"
+#include "visualize.h"
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2_ros/transform_broadcaster.h>
+#include <geometry_msgs/TransformStamped.h>
+#include <turtlesim/Pose.h>
 
 int main(int argc, char **argv)
 {
@@ -42,6 +47,32 @@ StereoOdometry::StereoOdometry(ros::NodeHandle &nodehandle,image_transport::Imag
     init = false;
 }
 
+void StereoOdometry::getInitialRot(double angleDown, double height){
+
+    cv::Mat Yby90 = (cv::Mat_<double>(3,3) <<   cos(M_PI/2), 0.0, sin(M_PI/2), 
+                                                0.0,         1.0,          0.0, 
+                                                -sin(M_PI/2), 0.0, cos(M_PI/2));
+
+    cv::Mat ZbyNeg90 = (cv::Mat_<double>(3,3) <<  cos(M_PI /2), sin(M_PI/2), 0.0, 
+                                                  -sin(M_PI /2), cos(M_PI/2),  0.0, 
+                                                            0.0,          0.0,  1.0);
+
+
+    cv::Mat PitchDownNegX = (cv::Mat_<double>(3,3) <<    1,             0,             0, 
+                                                         0, cos(M_PI/6) , sin(M_PI/6), 
+                                                         0, -sin(M_PI /6),  cos(M_PI/6));
+
+    cv::Mat R_init = Yby90*ZbyNeg90*PitchDownNegX;
+
+    cv::Mat T_init = (cv::Mat_<double>(3,1) << 0, 0, height);
+    cv::Mat homoRow = (cv::Mat_<double>(1,4) << 0, 0, 0,1);
+    cv::Mat temp;
+
+    cv::hconcat(R_init,T_init,temp);
+    cv::vconcat(temp,homoRow,H_init);
+
+}
+
 void StereoOdometry::initializeSubsAndPubs(){
 
     ROS_INFO("Initializing Subscribers and Publishers");
@@ -53,189 +84,93 @@ void StereoOdometry::initializeSubsAndPubs(){
 
     debug_pub = it.advertise("/ros_stereo_odo/debug_image", 1);
     pose_pub = nh.advertise<geometry_msgs::PoseStamped>("/ros_stereo_odo/pose", 100);
+    vis_pub = nh.advertise<visualization_msgs::MarkerArray>( "visualization_marker", 0 );
 
-    vis_pub = nh.advertise<visualization_msgs::Marker>( "visualization_marker", 0 );
-    marker.header.frame_id = "world";
-    marker.header.stamp = ros::Time();
-    marker.lifetime = ros::Duration(1.5);
-    
-    marker.id = 0;
-    marker.type = visualization_msgs::Marker::SPHERE;
-    marker.action = visualization_msgs::Marker::ADD;
-    marker.pose.orientation.x = 0.0;
-    marker.pose.orientation.y = 0.0;
-    marker.pose.orientation.z = 0.0;
-    marker.pose.orientation.w = 1.0;
-    marker.scale.x = 0.05;
-    marker.scale.y = 0.05;
-    marker.scale.z = 0.05;
-    marker.color.a = 1.0; // Don't forget to set the alpha!
-    marker.color.r = 1.0;
-    marker.color.g = 1.0;
-    marker.color.b = 1.0;
-
-    R_init = (cv::Mat_<double>(3,3) << 1, 0, 0, 
-                                       0, cos(M_PI /3), -sin(M_PI/3), 
-                                       0, sin(M_PI /3), cos(M_PI/3));
-    T_init = (cv::Mat_<double>(3,1) << 0, 0, .75);
-
-    // Q = (cv::Mat_<double>(4,4) << 1, 0, 0, -320, 
-    //                                       0, 1, 0, -240, 
-    //                                       0, 0, 0, -554.3826904296875,
-    //                                       0, 0, -14.28571428571428, 0);
-    pose = (cv::Mat_<double>(3,1) << 0, 0, 0) ;
-
+    double angle = M_PI/6;
+    double height = .75;
+    getInitialRot(angle, height);
+    depthMap = false;
+    visualize = true;
 
 }
+
+void StereoOdometry::visualizePoints(std::vector<cv::Point3f>& currWorldPoints, std::vector<cv::Point3f>& prevWorldPoints){
+    visualization_msgs::MarkerArray ma;
+    generateMarkerArray(ma, currWorldPoints, H_init, 0);
+    generateMarkerArray(ma, prevWorldPoints, H_init, currWorldPoints.size(), .5);
+    vis_pub.publish(ma.markers);
+
+    drawDebugImage(curr_image_left,  debug_image, currPoints, prevPoints);
+    sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "mono8", debug_image).toImageMsg();
+    debug_pub.publish(msg);
+
+    static tf2_ros::TransformBroadcaster br;
+    geometry_msgs::TransformStamped transformStamped = getTf(H_init);
+    br.sendTransform(transformStamped);
+}
+
+
 
 void StereoOdometry::imageCallback(const sensor_msgs::ImageConstPtr& left_msg, const sensor_msgs::ImageConstPtr& right_msg){
     try {
         
-
+        //Get Images, Rectify, and Calculate Disparity
         curr_image_left = cv_bridge::toCvShare(left_msg, "mono8")->image;
         curr_image_right = cv_bridge::toCvShare(right_msg, "mono8")->image;
-
         cv::Mat P = rectifyImages( curr_image_left,  curr_image_right, curr_image_left, curr_image_right,Q);
-
-
-        //getDepthMap( curr_image_left,  curr_image_right, depth_map_curr, Q);
-        //getDepthMap( prev_image_left,  prev_image_right, depth_map_prev, Q); 
         cv::Mat disp = getDisparity(curr_image_left, curr_image_right,  Q);
 
 
+        //Optional Get Depth Maps
+        if (depthMap){
+            getDepthMap( curr_image_left,  curr_image_right, depth_map_curr, Q);
+            getDepthMap( prev_image_left,  prev_image_right, depth_map_prev, Q); 
+        }
         
+        
+
         if (!init) {
+            //Initialize KeyPoints Features
             initKeypoints(curr_image_left, keypoints, currPoints);
             init = true;
-        } else {
-            matchFeatures(prev_image_left, curr_image_left, prevPoints, currPoints);
 
+        } else {
+
+            //Match Features and Calculate Disparity
+            matchFeatures(prev_image_left, curr_image_left, prevPoints, currPoints);
             cv::Mat dispPrev = getDisparity(prev_image_left, prev_image_right,  Q);
             cv::Mat dispCurr = getDisparity(curr_image_left, curr_image_right,  Q);
+            
+            //Project Points to 3D
             std::vector<cv::Point3f> currWorldPoints;
             std::vector<cv::Point3f> prevWorldPoints;
-            std::cout << prevPoints.size() << std::endl;
-            std::cout << currPoints.size() << std::endl;
-
             getWorldPoints(prevPoints, currPoints, prevWorldPoints, currWorldPoints, dispPrev, dispCurr, Q);
-
-
             
 
-            // std::cout << prevPoints.size() << std::endl;
-            // std::cout << currPoints.size() << std::endl;
-
-            // std::cout << prevWorldPoints.size() << std::endl;
-            // std::cout << currWorldPoints.size() << std::endl;
-
-            std::vector<std::vector<int>> ad_mat = getAdjacenyMatrix(prevWorldPoints, currWorldPoints, .01);
-
-            std::vector<int> clique = initializeClique(ad_mat);
-            // for (int i = 0; i < clique.size(); i++) { 
-            //     std::cout<< clique[i] << std::endl;
-            // } 
-
-
-            std::vector<int> potSet = potentialNodes(clique, ad_mat);
-
-            while (std::accumulate(potSet.begin(), potSet.end(), 0) > 0){
-                updateClique(potSet ,clique,ad_mat);
-                potSet = potentialNodes(clique, ad_mat);
-            }
-
-            updateCloud(prevPoints, currPoints, prevWorldPoints, currWorldPoints, clique);
+            //Prune Cloud to get Inliers
+            updateCloud(prevPoints, currPoints, prevWorldPoints, currWorldPoints);
             
 
+            //Optimize to get pose change and update pose
             cv::Mat optoTrans = optimizeTrans( P,  prevWorldPoints,  currWorldPoints,currPoints,prevPoints);
+            H_init = H_init*optoTrans;
 
 
-            cv::Mat trans = (cv::Mat_<double>(3,1) << optoTrans.at<double>(0,3)
-                , optoTrans.at<double>(1,3), optoTrans.at<double>(2,3));
-
-            pose = pose + R_init*trans;
-
-            
-
-
-
-            std::cout << clique.size() << std::endl;
-            std::cout << prevPoints.size() << std::endl;
-            std::cout << currPoints.size() << std::endl;
-
-            std::cout << prevWorldPoints.size() << std::endl;
-            std::cout << currWorldPoints.size() << std::endl;
-           
-
-            
-            for (int i = 0; i<currWorldPoints.size(); i++){
-
-
-                cv::Point3f pt = prevWorldPoints.at(i);
-                cv::Mat temp = (cv::Mat_<double>(3,1) << pt.x, pt.y, pt.z);
-                cv::Mat Final = pose + R_init*temp-T_init;
-                marker.ns = "prev_namespace";
-
-
-                marker.pose.position.x = Final.at<double>(0,0);
-                marker.pose.position.y = Final.at<double>(1,0);
-                marker.pose.position.z = Final.at<double>(2,0);
-                marker.id = i;
-                marker.color.g = 0.0;
-                vis_pub.publish( marker );
-            
-            }
-
-            for (int i = 0; i<currWorldPoints.size(); i++){
-
-
-                cv::Point3f pt = currWorldPoints.at(i);
-                cv::Mat temp = (cv::Mat_<double>(3,1) << pt.x, pt.y, pt.z);
-                cv::Mat Final = pose + R_init*temp-T_init;
-                marker.ns = "curr_namespace";
-
-
-                marker.pose.position.x = Final.at<double>(0,0);
-                marker.pose.position.y = Final.at<double>(1,0);
-                marker.pose.position.z = Final.at<double>(2,0);
-                marker.id = i+1000;
-                marker.color.g = 1.0;
-                vis_pub.publish( marker );
-            
-            }
-            drawFeatures(curr_image_left,  debug_image, currPoints, prevPoints);
+            //Optionally Visualize Results
+            if (visualize){
+                visualizePoints(currWorldPoints, prevWorldPoints);
+            }   
 
         }
 
-
-        
-        pose += T_init;
-        marker.ns = "yah_namespace";
-        marker.pose.position.x = pose.at<double>(0,0);
-        marker.pose.position.y = pose.at<double>(1,0);
-        marker.pose.position.z = pose.at<double>(2,0);
-        marker.id = 0;
-        marker.color.g = 0.5;
-        marker.scale.x = 0.2;
-        marker.scale.y = 0.2;
-        marker.scale.z = 0.2;
-        vis_pub.publish( marker );
-        marker.scale.x = 0.05;
-        marker.scale.y = 0.05;
-        marker.scale.z = 0.05;
-        pose -= T_init;
+        //Update Prev
         prevPoints = currPoints;
         std::vector<cv::Point2f> tmp;
         currPoints = tmp;
         prev_image_left = curr_image_left;
         prev_image_right = curr_image_right;
 
-        
-        
-
-        sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "mono8", debug_image).toImageMsg();
-        debug_pub.publish(msg);
-        std::cout << "found Image" << std::endl;
-
+ 
         if (prevPoints.size() < 100){
             init = false;
         }

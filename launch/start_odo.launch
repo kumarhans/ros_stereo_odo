@@ -1,0 +1,9 @@
+<launch>
+<node name="odometer" type="stereo_odom_node" pkg="ros_stereo_odo" output="screen"  />
+
+<node type="rviz" name="rviz" pkg="rviz"  />
+
+<node pkg="rosbag" type="play" name="player"  args=" /home/hansk/Downloads/slowDownOnly.bag"/>
+
+</launch>
+

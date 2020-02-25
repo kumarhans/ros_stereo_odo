@@ -38,5 +38,4 @@ void updateClique(std::vector<int> potentialSet, std::vector<int>& clique,
 std::vector<int> potentialNodes(const std::vector<int>& clique, const std::vector<std::vector<int>>& ad_mat);
 
 void updateCloud(std::vector<cv::Point2f>& PointsPrev, std::vector<cv::Point2f>& PointsCurr, 
-    std::vector<cv::Point3f>& worldPointsPrev, std::vector<cv::Point3f>& worldPointsCurr,std::vector<int>& clique);
-       
+    std::vector<cv::Point3f>& worldPointsPrev, std::vector<cv::Point3f>& worldPointsCurr);

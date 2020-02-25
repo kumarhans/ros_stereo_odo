@@ -37,8 +37,8 @@ void matchFeatures(const cv::Mat& prevImage, const cv::Mat& currImage, std::vect
     deleteFeatures(prevPoints, currPoints, status);
 
     //Print Size of Feature Vectors
-    std::cout << "prevPoints" << prevPoints.size() << std::endl;
-    std::cout << "currPoints" << currPoints.size() << std::endl;
+    // std::cout << "prevPoints" << prevPoints.size() << std::endl;
+    // std::cout << "currPoints" << currPoints.size() << std::endl;
 }
 
 void deleteFeatures(std::vector<cv::Point2f>& prevPoints, std::vector<cv::Point2f>& currPoints, std::vector<uchar> status){
@@ -55,21 +55,7 @@ void deleteFeatures(std::vector<cv::Point2f>& prevPoints, std::vector<cv::Point2
    
 }
 
-void drawFeatures(const cv::Mat& image, cv::Mat& debug_image, std::vector<cv::Point2f>& points, std::vector<cv::Point2f>& pointsPrev){
-    
-    image.copyTo(debug_image);
-    std::cout << "prevPoints" << pointsPrev.size() << std::endl;
-    std::cout << "currPoints" << points.size() << std::endl;
 
-    for(int i=0;i<points.size();i++){
-        if (pointsPrev.size() == points.size()){
-            //cv::circle(debug_image, points[i], 1, 1, -1, 8);
-            cv::circle(debug_image, pointsPrev[i], 1, 255, -1 ,8);
-
-        }
-        
-    }
-}
 
 
 
