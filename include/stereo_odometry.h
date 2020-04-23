@@ -49,6 +49,7 @@ public:
     cv::Mat depth_map_curr;
 
     cv::Mat H_init;
+    cv::Mat H_curr;
     cv::Mat pose;
 
     std::vector<std::vector<int>> ad_mat;

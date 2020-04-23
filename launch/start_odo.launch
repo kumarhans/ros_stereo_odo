@@ -3,7 +3,7 @@
 
 <node type="rviz" name="rviz" pkg="rviz"  />
 
-<node pkg="rosbag" type="play" name="player"  args=" /home/hansk/Downloads/slowDownOnly.bag"/>
+<node pkg="rosbag" type="play" name="player"  args="-r 2 /home/hansk/Downloads/slowDownOnly.bag"/>
 
 </launch>
 

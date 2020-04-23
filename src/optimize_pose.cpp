@@ -34,6 +34,7 @@ struct LMFunctor
 	std::vector<cv::Point3f> worldPointsCurr;
 	std::vector<cv::Point2f> currPoints;
     std::vector<cv::Point2f> prevPoints;
+	int maxOpt = 50;
 
 	// Compute 'm' errors, one for each data point, for the given parameter values in 'x'
 	int operator()(const Eigen::VectorXf &x, Eigen::VectorXf &fvec) const
@@ -48,7 +49,7 @@ struct LMFunctor
 		cv::Mat homoMatrix = toTransformationMat(x);
 
 
-		for (int i = 0; i < worldPointsPrev.size(); i++) {
+		for (int i = 0; i < m; i++) {
 
 			cv::Point2f ptPrev = prevPoints.at(i);
 			cv::Point2f ptCurr = currPoints.at(i);
@@ -135,7 +136,12 @@ cv::Mat optimizeTrans(cv::Mat P, std::vector<cv::Point3f>& worldPointsPrev,
 	std::vector<cv::Point2f>& prevPoints){
 
 	LMFunctor functor;
-	functor.m = worldPointsCurr.size();
+	if (worldPointsCurr.size() < functor.maxOpt){
+		functor.m = worldPointsCurr.size();
+	} else{
+		functor.m = functor.maxOpt;
+	}
+	
 	functor.n = 6;
 	functor.P = P; //3x4 Projection Matrix
 	functor.worldPointsPrev = worldPointsPrev;

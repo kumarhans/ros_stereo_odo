@@ -9,6 +9,7 @@
 #include <message_filters/sync_policies/approximate_time.h>
 #include <math.h>
 #include <numeric>
+#include <chrono>
  
 #ifndef M_PI
 const double M_PI = 3.14159265358979323846;
@@ -47,7 +48,10 @@ StereoOdometry::StereoOdometry(ros::NodeHandle &nodehandle,image_transport::Imag
     init = false;
 }
 
-void StereoOdometry::getInitialRot(double angleDown, double height){
+void StereoOdometry::getInitialRot(double pitch, double height){
+
+   
+    //float pitch = M_PI/6
 
     cv::Mat Yby90 = (cv::Mat_<double>(3,3) <<   cos(M_PI/2), 0.0, sin(M_PI/2), 
                                                 0.0,         1.0,          0.0, 
@@ -59,8 +63,8 @@ void StereoOdometry::getInitialRot(double angleDown, double height){
 
 
     cv::Mat PitchDownNegX = (cv::Mat_<double>(3,3) <<    1,             0,             0, 
-                                                         0, cos(M_PI/6) , sin(M_PI/6), 
-                                                         0, -sin(M_PI /6),  cos(M_PI/6));
+                                                         0, cos(pitch) , sin(pitch), 
+                                                         0, -sin(pitch),  cos(pitch));
 
     cv::Mat R_init = Yby90*ZbyNeg90*PitchDownNegX;
 
@@ -83,12 +87,13 @@ void StereoOdometry::initializeSubsAndPubs(){
     sync -> registerCallback(boost::bind(&StereoOdometry::imageCallback, this, _1, _2 ));   
 
     debug_pub = it.advertise("/ros_stereo_odo/debug_image", 1);
-    pose_pub = nh.advertise<geometry_msgs::PoseStamped>("/ros_stereo_odo/pose", 100);
-    vis_pub = nh.advertise<visualization_msgs::MarkerArray>( "visualization_marker", 0 );
+    pose_pub = nh.advertise<geometry_msgs::PoseStamped>("/ros_stereo_odo/pose", 1);
+    vis_pub = nh.advertise<visualization_msgs::MarkerArray>( "visualization_marker_arr", 0 );
 
-    double angle = M_PI/6;
-    double height = .75;
+    double angle = .33;
+    double height = .3;
     getInitialRot(angle, height);
+    H_curr = H_init.clone();
     depthMap = false;
     visualize = true;
 
@@ -96,16 +101,16 @@ void StereoOdometry::initializeSubsAndPubs(){
 
 void StereoOdometry::visualizePoints(std::vector<cv::Point3f>& currWorldPoints, std::vector<cv::Point3f>& prevWorldPoints){
     visualization_msgs::MarkerArray ma;
-    generateMarkerArray(ma, currWorldPoints, H_init, 0);
-    generateMarkerArray(ma, prevWorldPoints, H_init, currWorldPoints.size(), .5);
-    vis_pub.publish(ma.markers);
+    generateMarkerArray(ma, currWorldPoints, H_curr, 0);
+    generateMarkerArray(ma, prevWorldPoints, H_curr, currWorldPoints.size(), .5);
+    vis_pub.publish(ma);
 
     drawDebugImage(curr_image_left,  debug_image, currPoints, prevPoints);
     sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "mono8", debug_image).toImageMsg();
     debug_pub.publish(msg);
 
     static tf2_ros::TransformBroadcaster br;
-    geometry_msgs::TransformStamped transformStamped = getTf(H_init);
+    geometry_msgs::TransformStamped transformStamped = getTf(H_curr);
     br.sendTransform(transformStamped);
 }
 
@@ -136,24 +141,76 @@ void StereoOdometry::imageCallback(const sensor_msgs::ImageConstPtr& left_msg, c
 
         } else {
 
+            
+            auto start = std::chrono::steady_clock::now();
+            
             //Match Features and Calculate Disparity
             matchFeatures(prev_image_left, curr_image_left, prevPoints, currPoints);
             cv::Mat dispPrev = getDisparity(prev_image_left, prev_image_right,  Q);
             cv::Mat dispCurr = getDisparity(curr_image_left, curr_image_right,  Q);
+
+            auto end = std::chrono::steady_clock::now();
+            std::cout << "Elapsed time in milliseconds Matching: " 
+                << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+                << " ms" << std::endl;
+
+            
+            
+
+            start = std::chrono::steady_clock::now();
             
             //Project Points to 3D
             std::vector<cv::Point3f> currWorldPoints;
             std::vector<cv::Point3f> prevWorldPoints;
             getWorldPoints(prevPoints, currPoints, prevWorldPoints, currWorldPoints, dispPrev, dispCurr, Q);
-            
 
-            //Prune Cloud to get Inliers
-            updateCloud(prevPoints, currPoints, prevWorldPoints, currWorldPoints);
-            
+            end = std::chrono::steady_clock::now();
+            std::cout << "Elapsed time in milliseconds Projecting: " 
+                << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+                << " ms" << std::endl;
 
-            //Optimize to get pose change and update pose
+
+
+            // start = std::chrono::steady_clock::now();
+            // //Prune Cloud to get Inliers
+            // updateCloud(prevPoints, currPoints, prevWorldPoints, currWorldPoints);
+
+            // end = std::chrono::steady_clock::now();
+            // std::cout << "Elapsed time in milliseconds Pruning: " 
+            //     << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+            //     << " ms" << std::endl;
+
+
+
+
+
+
+
+            start = std::chrono::steady_clock::now();
+
+            // Optimize to get pose change and update pose
             cv::Mat optoTrans = optimizeTrans( P,  prevWorldPoints,  currWorldPoints,currPoints,prevPoints);
-            H_init = H_init*optoTrans;
+            H_curr = H_curr*optoTrans;
+
+            end = std::chrono::steady_clock::now();
+            std::cout << "Elapsed time in milliseconds Optimizing: " 
+                << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+                << " ms" << std::endl;
+
+
+            geometry_msgs::PoseStamped poseStamped;
+            poseStamped.header.frame_id="/world";
+            poseStamped.header.stamp = ros::Time::now();
+
+            cv::Mat H_odom =  H_init*optoTrans;
+            poseStamped.pose.position.x =  H_odom.at<double>(0,3);
+            poseStamped.pose.position.y = H_odom.at<double>(1,3);
+            poseStamped.pose.position.z = H_odom.at<double>(2,3);
+
+            pose_pub.publish(poseStamped);
+
+             
+
 
 
             //Optionally Visualize Results
