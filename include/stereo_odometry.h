@@ -17,6 +17,9 @@
 #include <tf2_ros/transform_broadcaster.h>
 #include <geometry_msgs/TransformStamped.h>
 #include <turtlesim/Pose.h>
+#include <nav_msgs/Path.h>
+#include <std_msgs/Float64.h>
+#include "parameters.h"
  
 
  
@@ -28,6 +31,7 @@ public:
     ~StereoOdometry();
 
     bool init;
+    bool init2;
     bool depthMap;
     bool visualize;
 
@@ -51,6 +55,9 @@ public:
     cv::Mat H_init;
     cv::Mat H_curr;
     cv::Mat pose;
+    nav_msgs::Path path;
+
+    std::vector<cv::Point3f> useThese;
 
     std::vector<std::vector<int>> ad_mat;
   
@@ -69,7 +76,7 @@ private:
 
     image_transport::Publisher debug_pub;
     ros::Publisher pose_pub;
-    
+    ros::Publisher path_pub;
     ros::Publisher vis_pub;
 
 

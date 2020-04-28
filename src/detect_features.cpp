@@ -20,7 +20,14 @@
 
 
 void initKeypoints(const cv::Mat& image, std::vector<cv::KeyPoint>& keypoints, std::vector<cv::Point2f>& points){
+    
+    // cv::Ptr<cv::ORB> detector = cv::ORB::create();
+    // cv::Mat descriptor_1;
+
+    // detector->detect(image, keypoints, descriptor_1);
+
     cv::FAST(image, keypoints, 10, true);
+
     cv::KeyPoint::convert(keypoints, points);
 }
 

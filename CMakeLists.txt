@@ -60,6 +60,7 @@ src/rectify_images.cpp
 src/point_util.cpp
 src/optimize_pose.cpp
 src/visualize.cpp
+src/parameters.cpp
 )
 
 target_link_libraries(stereo_odom_node ${catkin_LIBRARIES} ${OpenCV_LIBS})

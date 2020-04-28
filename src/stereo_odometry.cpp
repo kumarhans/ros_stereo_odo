@@ -25,16 +25,38 @@ const double M_PI = 3.14159265358979323846;
 #include "point_util.h"
 #include "optimize_pose.h"
 #include "visualize.h"
+#include "parameters.h"
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2_ros/transform_broadcaster.h>
 #include <geometry_msgs/TransformStamped.h>
 #include <turtlesim/Pose.h>
+
+
+
+float ControlState;
+void StateCallback(const std_msgs::Float64::ConstPtr& msg){
+  ControlState = msg->data;
+}
 
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "ros_stereo_odo");
     ros::NodeHandle nh; 
     image_transport::ImageTransport it(nh);
+    readParameters(nh);
+
+     
+
+
+    ros::Subscriber sub = nh.subscribe("/m6/control_state", 100, StateCallback);
+
+
+    // ros::Rate r(10); // 10 hz
+    // while (ControlState < .5){ 
+    //   ros::spinOnce();
+    //   r.sleep();
+    // }
+
 
     StereoOdometry node(nh, it);
     ros::Rate loop_rate(100);
@@ -44,14 +66,21 @@ int main(int argc, char **argv)
 }
 
 StereoOdometry::StereoOdometry(ros::NodeHandle &nodehandle,image_transport::ImageTransport &imagehandle):nh(nodehandle),it(imagehandle){
+
+  
+    // std::vector<std::string> keys;
+    // nh.getParamNames(keys)
+
+
     initializeSubsAndPubs();
     init = false;
+    init2 = false;
 }
 
 void StereoOdometry::getInitialRot(double pitch, double height){
 
    
-    //float pitch = M_PI/6
+     
 
     cv::Mat Yby90 = (cv::Mat_<double>(3,3) <<   cos(M_PI/2), 0.0, sin(M_PI/2), 
                                                 0.0,         1.0,          0.0, 
@@ -67,7 +96,6 @@ void StereoOdometry::getInitialRot(double pitch, double height){
                                                          0, -sin(pitch),  cos(pitch));
 
     cv::Mat R_init = Yby90*ZbyNeg90*PitchDownNegX;
-
     cv::Mat T_init = (cv::Mat_<double>(3,1) << 0, 0, height);
     cv::Mat homoRow = (cv::Mat_<double>(1,4) << 0, 0, 0,1);
     cv::Mat temp;
@@ -80,18 +108,29 @@ void StereoOdometry::getInitialRot(double pitch, double height){
 void StereoOdometry::initializeSubsAndPubs(){
 
     ROS_INFO("Initializing Subscribers and Publishers");
-    left_sub.subscribe(it,"/left_r200/camera/color/image_raw", 1);
-    right_sub.subscribe(it,"/right_r200/camera/color/image_raw", 1);
+    left_sub.subscribe(it,IMAGE_L_TOPIC, 1);
+    right_sub.subscribe(it,IMAGE_R_TOPIC, 1);
      
     sync = new message_filters::Synchronizer<MySyncPolicy> (MySyncPolicy(10), left_sub, right_sub);
     sync -> registerCallback(boost::bind(&StereoOdometry::imageCallback, this, _1, _2 ));   
 
     debug_pub = it.advertise("/ros_stereo_odo/debug_image", 1);
     pose_pub = nh.advertise<geometry_msgs::PoseStamped>("/ros_stereo_odo/pose", 1);
-    vis_pub = nh.advertise<visualization_msgs::MarkerArray>( "visualization_marker_arr", 0 );
+    vis_pub = nh.advertise<visualization_msgs::MarkerArray>( "/ros_stereo_odo/visualization_marker_arr", 0 );
+    path_pub = nh.advertise<nav_msgs::Path>("/vo/path", 1);
+ 
 
-    double angle = .33;
-    double height = .3;
+
+
+    // double angle = .33;
+    // double height = .3;
+
+    double angle = M_PI/6;
+    double height = .6;
+
+    // angle = 0;
+    // height = 0;
+
     getInitialRot(angle, height);
     H_curr = H_init.clone();
     depthMap = false;
@@ -137,11 +176,13 @@ void StereoOdometry::imageCallback(const sensor_msgs::ImageConstPtr& left_msg, c
         if (!init) {
             //Initialize KeyPoints Features
             initKeypoints(curr_image_left, keypoints, currPoints);
+            
             init = true;
+            init2 = false;
 
         } else {
 
-            
+            //initKeypoints(prev_image_left, keypoints, prevPoints);
             auto start = std::chrono::steady_clock::now();
             
             //Match Features and Calculate Disparity
@@ -160,9 +201,16 @@ void StereoOdometry::imageCallback(const sensor_msgs::ImageConstPtr& left_msg, c
             start = std::chrono::steady_clock::now();
             
             //Project Points to 3D
+
             std::vector<cv::Point3f> currWorldPoints;
             std::vector<cv::Point3f> prevWorldPoints;
             getWorldPoints(prevPoints, currPoints, prevWorldPoints, currWorldPoints, dispPrev, dispCurr, Q);
+ 
+            // if (!init2){ 
+            
+            //     useThese = prevWorldPoints;
+            //     init2 = true;
+            // }
 
             end = std::chrono::steady_clock::now();
             std::cout << "Elapsed time in milliseconds Projecting: " 
@@ -171,14 +219,14 @@ void StereoOdometry::imageCallback(const sensor_msgs::ImageConstPtr& left_msg, c
 
 
 
-            // start = std::chrono::steady_clock::now();
-            // //Prune Cloud to get Inliers
-            // updateCloud(prevPoints, currPoints, prevWorldPoints, currWorldPoints);
+            start = std::chrono::steady_clock::now();
+            //Prune Cloud to get Inliers
+            updateCloud(prevPoints, currPoints, prevWorldPoints, currWorldPoints);
 
-            // end = std::chrono::steady_clock::now();
-            // std::cout << "Elapsed time in milliseconds Pruning: " 
-            //     << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
-            //     << " ms" << std::endl;
+            end = std::chrono::steady_clock::now();
+            std::cout << "Elapsed time in milliseconds Pruning: " 
+                << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()
+                << " ms" << std::endl;
 
 
 
@@ -189,8 +237,11 @@ void StereoOdometry::imageCallback(const sensor_msgs::ImageConstPtr& left_msg, c
             start = std::chrono::steady_clock::now();
 
             // Optimize to get pose change and update pose
+        
             cv::Mat optoTrans = optimizeTrans( P,  prevWorldPoints,  currWorldPoints,currPoints,prevPoints);
-            H_curr = H_curr*optoTrans;
+
+
+            H_curr *= optoTrans;
 
             end = std::chrono::steady_clock::now();
             std::cout << "Elapsed time in milliseconds Optimizing: " 
@@ -201,13 +252,25 @@ void StereoOdometry::imageCallback(const sensor_msgs::ImageConstPtr& left_msg, c
             geometry_msgs::PoseStamped poseStamped;
             poseStamped.header.frame_id="/world";
             poseStamped.header.stamp = ros::Time::now();
-
             cv::Mat H_odom =  H_init*optoTrans;
             poseStamped.pose.position.x =  H_odom.at<double>(0,3);
             poseStamped.pose.position.y = H_odom.at<double>(1,3);
             poseStamped.pose.position.z = H_odom.at<double>(2,3);
 
+
+            
+
             pose_pub.publish(poseStamped);
+
+            poseStamped.pose.position.x =  H_curr.at<double>(0,3);
+            poseStamped.pose.position.y = H_curr.at<double>(1,3);
+            poseStamped.pose.position.z = H_curr.at<double>(2,3);
+
+
+            path.header.frame_id = "world";
+            path.poses.push_back(poseStamped);
+            path.header.stamp = poseStamped.header.stamp;
+            path_pub.publish(path);
 
              
 

@@ -1,9 +1,14 @@
 <launch>
-<node name="odometer" type="stereo_odom_node" pkg="ros_stereo_odo" output="screen"  />
+
+<rosparam command="load" file="$(find ros_stereo_odo)/config/simulation.yaml" /> 
+ 
+
+<node name="odometer1" type="stereo_odom_node" pkg="ros_stereo_odo" output="screen"  />
+<!-- <node name="odometer" type="vo_node" pkg="vo_practice" output="screen"  /> -->
 
 <node type="rviz" name="rviz" pkg="rviz"  />
 
-<node pkg="rosbag" type="play" name="player"  args="-r 2 /home/hansk/Downloads/slowDownOnly.bag"/>
+<node pkg="rosbag" type="play" name="player"  args="-r 4 /home/hansk/Downloads/slowDownOnly.bag"/>
 
 </launch>
 

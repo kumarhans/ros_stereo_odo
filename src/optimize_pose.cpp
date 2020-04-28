@@ -25,6 +25,10 @@
 #include <string>
 #include "optimize_pose.h"
 
+
+
+
+
 struct LMFunctor
 {
 	
@@ -161,11 +165,71 @@ cv::Mat optimizeTrans(cv::Mat P, std::vector<cv::Point3f>& worldPointsPrev,
 	Eigen::LevenbergMarquardt<LMFunctor, float> lm(functor);
 
 	int status = lm.minimize(x);	
-	// std::cout << "LM optimization status: " << status << std::endl;
-	// std::cout << x << std::endl;
-
 	cv::Mat transform = toTransformationMat(x);
+	 
+// 	double fx= 554.3826904296875;
+// double fy= 554.3826904296875;
+// double cx= 320.0;
+// double cy= 240.0;
+// double k1= 0.0;
+// double k2= 0.0;
+// double p1= 0.0;
+// double p2= 0.0;
+// double k3= 0.0;
+// int width= 480;
+// int height= 360;
 
+
+// std::vector<cv::Mat> CM; // Stores 3x3 Camera Matricies
+// cv::Mat cameraMatrix1 = (cv::Mat_<double>(3,3) << fx, 0, cx, 
+// 	                                          0, fy, cy, 
+// 	                                          0, 0, 1);
+
+// cv::Mat cameraMatrix2 = (cv::Mat_<double>(3,3) << fx, 0, cx, 
+// 	                                          0, fy, cy, 
+// 	                                          0, 0, 1);
+
+
+
+
+// std::vector<cv::Mat> DC; // Stores 5x1 Camera Matricies
+// cv::Mat distCoeffs1 = (cv::Mat_<double>(1,5) << k1, k2, p1, p2, k3);
+// cv::Mat distCoeffs2 = (cv::Mat_<double>(1,5) << k1, k2, p1, p2, k3);
+
+
+
+// cv::Size imageSize = cv::Size_<int>(width,height);
+
+
+// cv::Mat R = (cv::Mat_<double>(3,3) << 1, 0, 0, 
+// 	                                  0, 1, 0, 
+// 	                                  0, 0, 1);
+
+// cv::Mat T = (cv::Mat_<double>(3,1) << 0, -0.07, 0);
+
+// 	cv::Mat rvec;
+// 	cv::Mat tvec;
+// 	cv::Mat rotMatrix;
+
+// 	//cv::solvePnP(worldPointsPrev, currPoints, cameraMatrix1, distCoeffs1, rvec, tvec);
+// 	cv::solvePnPRansac(worldPointsPrev, currPoints, cameraMatrix1, cv::Mat::zeros(4, 1, CV_32F), rvec, tvec);
+// 	// cv::solvePnP(worldPointsCurr, prevPoints, cameraMatrix1, distCoeffs1, rvec, tvec);
+
+// 	// solvePnPRansac(last_keyframe->features_3d,
+//     //              tracked_features,
+//     //              left_pmat.colRange(0, 3),
+//     //              cv::Mat::zeros(4, 1, CV_32F),
+//     //              rvec, tvec);
+	
+// 	cv::Rodrigues(rvec, rotMatrix);
+
+
+// 	cv::Mat transform = (cv::Mat_<double>(4,4) <<   rotMatrix.at<double>(0,0), rotMatrix.at<double>(0,1), rotMatrix.at<double>(0,2), tvec.at<double>(0,0),
+// 								    			   rotMatrix.at<double>(1,0), rotMatrix.at<double>(1,1), rotMatrix.at<double>(1,2), tvec.at<double>(1,0),
+// 								    			   rotMatrix.at<double>(2,0), rotMatrix.at<double>(2,1), rotMatrix.at<double>(2,2), tvec.at<double>(2,0),
+// 								    			   0,              0,              0,               1);
+
+// 	transform = transform.inv();
 	return transform;
 	
 
